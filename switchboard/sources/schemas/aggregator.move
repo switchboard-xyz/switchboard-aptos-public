@@ -3,7 +3,7 @@ module Switchboard::Aggregator {
     use Switchboard::Math::{Self, Num};
     use std::bcs;
     use std::hash;
-    use std::option::{Self, Option};
+    use std::option::{Option};
     use std::signer;
     use std::vector;
 
@@ -232,20 +232,6 @@ module Switchboard::Aggregator {
         aggregator.is_locked = true;
     }
 
-    public fun save_result(aggregator_addr: address, oracle_idx: u64, value: &Num): bool acquires Aggregator {
-        let aggregator = borrow_global_mut<Aggregator>(aggregator_addr);
-        let val_ref = vector::borrow_mut(&mut aggregator.current_round.medians, oracle_idx);
-        *val_ref = option::some(*value);
-        let uwm = VecUtils::unwrap(&aggregator.current_round.medians);
-        aggregator.current_round.result = Math::median(&uwm);
-        // TODO: mgild
-        /* aggregator.current_round.std_deviation = Math::std_deviation(&uwm); */
-        if (vector::length(&uwm) >= aggregator.min_oracle_results) {
-            aggregator.latest_confirmed_round = aggregator.current_round;
-            return true
-        };
-        false
-    }
 
     // GETTERS 
     public fun get_latest_value(addr: address): Num acquires Aggregator {

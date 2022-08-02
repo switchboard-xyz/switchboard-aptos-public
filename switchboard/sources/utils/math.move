@@ -1,9 +1,5 @@
 module Switchboard::Math {
 
-    use Switchboard::VecUtils;
-    use std::vector;
-    use std::error;
-
     const EINCORRECT_STD_DEV: u64 = 0;
     const ENO_LENGTH_PASSED_IN_STD_DEV: u64 = 1;
     const EMORE_THAN_18_DECIMALS: u64 = 2;
@@ -72,92 +68,6 @@ module Switchboard::Math {
       }
     }
 
-    // TODO: get weighted median
-    public fun median(v: &vector<Num>): Num {
-        let v = sort(v);
-        *vector::borrow(&v, vector::length(&v) / 2)
-    }
-
-    public fun std_deviation(medians: &vector<Num>): Num {
-        let median = median(medians);
-
-        // length of decimals
-        let length = vector::length<Num>(medians);
-
-        // check that there are medians passed in
-        assert!(length != 0, error::internal(ENO_LENGTH_PASSED_IN_STD_DEV));
-
-        // zero out response
-        let res = zero();
-        let distance = zero();
-        let variance = zero();
-
-        let i = 0;
-        while (i < length) {
-
-            // get median i
-            let median_i = vector::borrow<Num>(medians, i);
-
-            // subtract the median from the result
-            sub(median_i, &median, &mut distance);
-
-            // square res (copies on each operation)
-            mul(
-                &distance, 
-                &distance,
-                &mut variance
-            );
-
-            // add distance to res, write it to distance
-            add(&res, &variance, &mut distance);
-            res.value = distance.value;
-            res.dec = distance.dec;
-            res.neg = distance.neg;
-
-            // iterate
-            i = i + 1;
-        };
-
-        // divide by length
-        div(&res, &num((length as u128), 0, false), &mut distance);
-
-        // get sqrt
-        sqrt(&distance, &mut res);
-
-        res
-    }
-
-    public fun sort(v: &vector<Num>): vector<Num> {
-        let size = vector::length(v);
-        let alloc = vector::empty();
-        if (size <= 1) {
-            return *v
-        };
-
-        let (left, right) = VecUtils::esplit(v);
-        let left = sort(&left);
-        let right = sort(&right);
-   
-
-        loop {
-            let left_len = vector::length<Num>(&left);
-            let right_len = vector::length<Num>(&right);
-            if (left_len != 0 && right_len != 0) {
-                // TODO: play with reversing to switch remove with pop_back
-                if (gt(vector::borrow<Num>(&right, 0), vector::borrow<Num>(&left, 0))) {
-                   vector::push_back<Num>(&mut alloc, vector::remove<Num>(&mut left, 0));
-                } else {
-                    vector::push_back<Num>(&mut alloc, vector::remove<Num>(&mut right, 0));
-                }
-            } else if (left_len != 0) {
-                vector::push_back<Num>(&mut alloc, vector::remove<Num>(&mut left, 0));
-            } else if (right_len != 0) {
-                vector::push_back<Num>(&mut alloc, vector::remove<Num>(&mut right, 0));
-            } else {
-                return alloc
-            };
-        }
-    }
 
     // By reference 
 
