@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@switchboard-xyz/switchboard-v2": "^0.0.123",
+    "@switchboard-xyz/v2-task-runner": "^0.1.61",
+    "aptos": "^1.2.0",
+    "big.js": "^6.2.1",
+    "bn.js": "^5.2.1",
+    "node-fetch": "^2.6.7",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.6"
+  }
+}
