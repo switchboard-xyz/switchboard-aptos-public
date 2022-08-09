@@ -1,7 +1,5 @@
 module Switchboard::Math {
 
-    use Std::vector;
-
     const EINCORRECT_STD_DEV: u64 = 0;
     const ENO_LENGTH_PASSED_IN_STD_DEV: u64 = 1;
     const EMORE_THAN_18_DECIMALS: u64 = 2;
