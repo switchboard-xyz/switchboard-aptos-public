@@ -70,11 +70,6 @@ module Switchboard::Math {
       }
     }
 
-    public fun std_deviation(medians: &vector<Num>, median: &Num): Num {
-        zero()
-    }
-    
-
 
     // By reference 
 
