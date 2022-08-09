@@ -71,12 +71,11 @@ module Switchboard::Math {
     }
 
     public fun std_deviation(medians: &vector<Num>, median: &Num): Num {
-        vector::length(medians);
-        std::debug::print(medians);
-        std::debug::print(median);
         zero()
     }
     
+
+
     // By reference 
 
     fun abs_gt(val1: &Num, val2: &Num): bool {
