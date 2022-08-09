@@ -287,32 +287,4 @@ module Switchboard::Math {
             return (num.value / pow_10(num.dec - scale_dec))
         }
     }
-
-    #[test(account = @0x1)]
-    public entry fun test_math() {
-
-        let vec = vector::empty<Num>();
-
-        // inputs are value, scale factor
-        let decimal1 = num(10, 0, false);
-        let decimal2 = num(11, 0, false);
-        let decimal3 = num(12, 0, false);
-        let decimal4 = num(13, 0, false);
-        let decimal5 = num(14, 0, false);
-
-        // push the decimal
-        vector::push_back<Num>(&mut vec, decimal1);
-        vector::push_back<Num>(&mut vec, decimal2);
-        vector::push_back<Num>(&mut vec, decimal3);
-        vector::push_back<Num>(&mut vec, decimal4);
-        vector::push_back<Num>(&mut vec, decimal5);
-
-        // std_deviation
-        let t1 = std_deviation(&vec);
-
-        std::debug::print(&t1);
-
-       // let out = zero();
-       // sqrt(&num(340282366920938463463374607431, 9, false), &mut out);
-    }
 }
