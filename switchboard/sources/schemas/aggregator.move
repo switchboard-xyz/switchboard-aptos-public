@@ -1,11 +1,11 @@
 module Switchboard::Aggregator {
     use AptosFramework::timestamp;
     use Switchboard::Math::{Self, Num};
-    use std::bcs;
-    use std::hash;
-    use std::option::{Option};
-    use std::signer;
-    use std::vector;
+    use Std::bcs;
+    use Std::hash;
+    use Std::option::{Option};
+    use Std::signer;
+    use Std::vector;
 
 
     struct AggregatorRound has key, store, copy, drop {
@@ -260,7 +260,7 @@ module Switchboard::Aggregator {
         let aggregator = borrow_global<Aggregator>(addr);
         aggregator.current_round.oracle_keys
     }
-    
+
     // public entry fun new_test(account: &signer) {
     //     let aggregator = Aggregator {
     //         addr: @0x55,

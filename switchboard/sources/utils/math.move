@@ -1,6 +1,6 @@
 module Switchboard::Math {
 
-    use std::vector;
+    use Std::vector;
 
     const EINCORRECT_STD_DEV: u64 = 0;
     const ENO_LENGTH_PASSED_IN_STD_DEV: u64 = 1;
