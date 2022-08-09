@@ -1,5 +1,7 @@
 module Switchboard::Math {
 
+    use std::vector;
+
     const EINCORRECT_STD_DEV: u64 = 0;
     const ENO_LENGTH_PASSED_IN_STD_DEV: u64 = 1;
     const EMORE_THAN_18_DECIMALS: u64 = 2;
@@ -68,7 +70,12 @@ module Switchboard::Math {
       }
     }
 
-
+    public fun std_deviation(medians: &vector<Num>, median: &Num): Num {
+        std::debug::print(medians);
+        std::debug::print(median);
+        zero()
+    }
+    
     // By reference 
 
     fun abs_gt(val1: &Num, val2: &Num): bool {
