@@ -71,6 +71,7 @@ module Switchboard::Math {
     }
 
     public fun std_deviation(medians: &vector<Num>, median: &Num): Num {
+        vector::length(medians);
         std::debug::print(medians);
         std::debug::print(median);
         zero()
