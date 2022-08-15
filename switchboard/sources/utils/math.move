@@ -20,9 +20,14 @@ module Switchboard::Math {
             EMORE_THAN_18_DECIMALS
         );
         let num = Num { value, dec, neg };
-        normalize(&mut num);
+
+        // expand nums out 
+        num.value = scale_to_decimals(&num, MAX_DECIMALS);
+        num.dec = MAX_DECIMALS;
+
         num
     }
+
 
     public fun pow(base: u64, exp: u8): u128 {
         let result_val = 1u128;

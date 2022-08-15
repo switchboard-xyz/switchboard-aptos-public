@@ -261,7 +261,7 @@ module Switchboard::Aggregator {
         aggregator.current_round.oracle_keys
     }
 
-    public entry fun new_test(account: &signer) {
+    public entry fun new_test(account: &signer, value: u128, dec: u8, sign: bool) {
         let aggregator = Aggregator {
             addr: @0x55,
             name: vector::empty(),
@@ -280,7 +280,7 @@ module Switchboard::Aggregator {
             crank_address: @0x55,
             latest_confirmed_round: AggregatorRound {
                 round_open_timestamp: 0,
-                result: Math::num(3141592653, 9, false),
+                result: Math::num(value, dec, sign),
                 std_deviation: Math::num(3141592653, 9, false),
                 min_response: Math::num(3141592653, 9, false),
                 max_response: Math::num(3141592653, 9, false),
@@ -310,5 +310,10 @@ module Switchboard::Aggregator {
         };
 
         move_to<Aggregator>(account, aggregator);
+    }
+
+    public entry fun update_value(addr: address, value: u128, dec: u8, neg: bool) acquires Aggregator {
+        let ref = borrow_global_mut<Aggregator>(addr);
+        ref.latest_confirmed_round.result = Math::num(value, dec, neg);
     }
 }
