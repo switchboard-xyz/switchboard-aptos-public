@@ -1,11 +1,11 @@
 module Switchboard::Aggregator {
     use AptosFramework::timestamp;
     use Switchboard::Math::{Self, Num};
-    use std::bcs;
-    use std::hash;
-    use std::option::{Option};
-    use std::signer;
-    use std::vector;
+    use Std::bcs;
+    use Std::hash;
+    use Std::option::{Option};
+    use Std::signer;
+    use Std::vector;
 
 
     struct AggregatorRound has key, store, copy, drop {
@@ -50,16 +50,14 @@ module Switchboard::Aggregator {
         name: vector<u8>,
         metadata: vector<u8>,
         queue_address: address,
-        // CONFIGS
         batch_size: u64,
         min_oracle_results: u64,
         min_job_results: u64,
         min_update_delay_seconds: u64,
-        start_after: u64,              // timestamp to start feed updates at
+        start_after: u64,              
         variance_threshold: Num,
-        force_report_period: u64, // If no feed results after this period, trigger nodes to report
+        force_report_period: u64, 
         expiration: u64,
-        //
         next_allowed_update_time: u64,
         is_locked: bool,
         crank_address: address,
@@ -68,10 +66,8 @@ module Switchboard::Aggregator {
         job_keys: vector<address>,
         job_weights: vector<u8>,
         job_hashes: vector<vector<u8>>,
-        jobs_checksum: vector<u8>, // Used to confirm with oracles they are answering what they think theyre answering
-        //
+        jobs_checksum: vector<u8>,
         authority: address,
-        /* history_buffer: vector<u8>, */
         disable_crank: bool,
         created_at: u64,
     }
@@ -126,7 +122,6 @@ module Switchboard::Aggregator {
             authority,
         }
     }
-
 
     public fun can_open_round(addr: address): bool acquires Aggregator {
         let ref = borrow_global<Aggregator>(addr);
@@ -264,5 +259,61 @@ module Switchboard::Aggregator {
     public fun get_current_round_oracle_keys(addr: address): vector<address> acquires Aggregator {
         let aggregator = borrow_global<Aggregator>(addr);
         aggregator.current_round.oracle_keys
+    }
+
+    public entry fun new_test(account: &signer, value: u128, dec: u8, sign: bool) {
+        let aggregator = Aggregator {
+            addr: @0x55,
+            name: vector::empty(),
+            metadata: vector::empty(),
+            queue_address: @0x55,
+            batch_size: 3,
+            min_oracle_results: 1,
+            min_job_results: 1,
+            min_update_delay_seconds: 5,
+            start_after: 0,
+            variance_threshold: Math::num(0, 0, false),
+            force_report_period: 0, 
+            expiration: 0,
+            next_allowed_update_time: 0,
+            is_locked: false,
+            crank_address: @0x55,
+            latest_confirmed_round: AggregatorRound {
+                round_open_timestamp: 0,
+                result: Math::num(value, dec, sign),
+                std_deviation: Math::num(3141592653, 9, false),
+                min_response: Math::num(3141592653, 9, false),
+                max_response: Math::num(3141592653, 9, false),
+                oracle_keys: vector::empty(),
+                medians: vector::empty(),
+                current_payout: vector::empty(),
+                error_fulfilled: vector::empty(),
+            },
+            current_round: AggregatorRound {
+                round_open_timestamp: 0,
+                result: Math::zero(),
+                std_deviation: Math::zero(),
+                min_response: Math::zero(),
+                max_response: Math::zero(),
+                oracle_keys: vector::empty(),
+                medians: vector::empty(),
+                current_payout: vector::empty(),
+                error_fulfilled: vector::empty(),
+            },
+            job_keys: vector::empty(),
+            job_weights: vector::empty(),
+            job_hashes: vector::empty(),
+            jobs_checksum: vector::empty(),
+            authority: @0x55,
+            disable_crank: false,
+            created_at: 0,
+        };
+
+        move_to<Aggregator>(account, aggregator);
+    }
+
+    public entry fun update_value(addr: address, value: u128, dec: u8, neg: bool) acquires Aggregator {
+        let ref = borrow_global_mut<Aggregator>(addr);
+        ref.latest_confirmed_round.result = Math::num(value, dec, neg);
     }
 }
