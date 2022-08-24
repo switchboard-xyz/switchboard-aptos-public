@@ -298,11 +298,11 @@ module Switchboard::Aggregator {
             },
             job_keys: vector::empty(),
             job_weights: vector::empty(),
-            job_hashes: vector::empty(),
             jobs_checksum: vector::empty(),
             authority: @0x55,
             disable_crank: false,
             created_at: 0,
+            crank_row_count: 0,
         };
 
         move_to<Aggregator>(account, aggregator);
