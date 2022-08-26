@@ -1,6 +1,6 @@
-module Switchboard::Math {
+module switchboard::math {
 
-    use Switchboard::VecUtils;
+    use switchboard::vec_utils;
     use std::vector;
 
     const EINCORRECT_STD_DEV: u64 = 0;
@@ -19,7 +19,7 @@ module Switchboard::Math {
         U128_MAX
     }
 
-    public fun num(value: u128, dec: u8, neg: bool): SwitchboardDecimal {
+    public fun new(value: u128, dec: u8, neg: bool): SwitchboardDecimal {
         assert!(
             dec <= MAX_DECIMALS,
             EMORE_THAN_9_DECIMALS
@@ -47,7 +47,7 @@ module Switchboard::Math {
         pow(10, exp)
     }
 
-    public fun num_unpack(num: SwitchboardDecimal): (u128, u8, bool) {
+    public fun unpack(num: SwitchboardDecimal): (u128, u8, bool) {
         let SwitchboardDecimal { value, dec, neg } = num;
         (value, dec, neg)
     }
@@ -100,7 +100,7 @@ module Switchboard::Math {
             return *v
         };
 
-        let (left, right) = VecUtils::esplit(v);
+        let (left, right) = vec_utils::esplit(v);
         let left = sort(&left);
         let right = sort(&right);
    

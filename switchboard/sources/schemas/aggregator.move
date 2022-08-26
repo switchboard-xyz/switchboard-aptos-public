@@ -1,14 +1,14 @@
-module Switchboard::Aggregator {
-    use AptosFramework::timestamp;
-    use Switchboard::Math::{Self, SwitchboardDecimal};
-    use std::bcs;
-    use std::hash;
-    use std::option::{Option};
+module switchboard::aggregator {
+    use aptos_framework::timestamp;
+    use switchboard::math::{Self, SwitchboardDecimal};
+    use switchboard::vec_utils;
+    use std::option::{Self, Option};
     use std::signer;
     use std::vector;
 
+
     struct AggregatorRound has store, copy, drop {
-        // Maintains the `solana_program::clock::Unixtimestamp;` the round was opened at.
+        // Maintains the time that the round was opened at.
         round_open_timestamp: u64,
         // Maintains the current median of all successful round responses.
         result: SwitchboardDecimal,
@@ -18,34 +18,37 @@ module Switchboard::Aggregator {
         min_response: SwitchboardDecimal,
         // Maintains the maximum node response this round.
         max_response: SwitchboardDecimal,
-        // lease_key: Pubkey,
         // Pubkeys of the oracles fulfilling this round.
         oracle_keys: vector<address>,
-        // oracle_pubkeys_size: u32, IMPLIED BY ORACLE_REQUEST_BATCH_SIZE
         // Represents all successful node responses this round. `NaN` if empty.
         medians: vector<Option<SwitchboardDecimal>>,
         // Current rewards/slashes oracles have received this round.
         current_payout: vector<SwitchboardDecimal>,
         // could do specific error codes
-        error_fulfilled: vector<bool>,
+        errors_fulfilled: vector<bool>,
+        // Maintains the number of successful responses received from nodes.
+        // Nodes can submit one successful response per round.
+        num_success: u64,
+        num_error: u64,
     }
 
     public fun default_round(): AggregatorRound {
         AggregatorRound {
             round_open_timestamp: 0,
-            result: Math::zero(),
-            std_deviation: Math::zero(),
-            min_response: Math::zero(),
-            max_response: Math::zero(),
+            result: math::zero(),
+            std_deviation: math::zero(),
+            min_response: math::zero(),
+            max_response: math::zero(),
             oracle_keys: vector::empty(),
             medians: vector::empty(),
             current_payout: vector::empty(),
-            error_fulfilled: vector::empty(),
+            errors_fulfilled: vector::empty(),
+            num_error: 0,
+            num_success: 0,
         }
     }
 
     struct Aggregator has key, store, drop {
-        addr: address,
         name: vector<u8>,
         metadata: vector<u8>,
         queue_address: address,
@@ -54,7 +57,7 @@ module Switchboard::Aggregator {
         min_oracle_results: u64,
         min_job_results: u64,
         min_update_delay_seconds: u64,
-        start_after: u64,              // timestamp to start feed updates at
+        start_after: u64,  // timestamp to start feed updates at
         variance_threshold: SwitchboardDecimal,
         force_report_period: u64, // If no feed results after this period, trigger nodes to report
         expiration: u64,
@@ -76,7 +79,6 @@ module Switchboard::Aggregator {
     }
 
     struct AggregatorConfigParams has drop, copy {
-        state_addr: address,
         addr: address,
         name: vector<u8>,
         metadata: vector<u8>,
@@ -92,8 +94,15 @@ module Switchboard::Aggregator {
         authority: address,
     }
 
+    public fun addr_from_conf(conf: &AggregatorConfigParams): address {
+        conf.addr
+    }
+
+    public fun queue_from_conf(conf: &AggregatorConfigParams): address {
+        conf.queue_address
+    }
+
     public fun new_config(
-        state_addr: address,
         addr: address,
         name: vector<u8>,
         metadata: vector<u8>,
@@ -109,7 +118,6 @@ module Switchboard::Aggregator {
         authority: address,
     ): AggregatorConfigParams {
         AggregatorConfigParams {
-            state_addr,
             addr,
             name,
             metadata,
@@ -126,12 +134,6 @@ module Switchboard::Aggregator {
         }
     }
 
-
-    public fun can_open_round(addr: address): bool acquires Aggregator {
-        let ref = borrow_global<Aggregator>(addr);
-        timestamp::now_seconds() >= ref.next_allowed_update_time
-    }
-
     public(friend) fun exist(addr: address): bool {
         exists<Aggregator>(addr)
     }
@@ -141,34 +143,12 @@ module Switchboard::Aggregator {
         ref.authority == signer::address_of(account)
     }
 
-    public fun state_addr(conf: &AggregatorConfigParams): &address { &conf.state_addr }
-
-    public(friend) fun add_crank_row_count(self: &address) acquires Aggregator {
-        let aggregator = borrow_global_mut<Aggregator>(*self);
-        aggregator.crank_row_count = aggregator.crank_row_count + 1;
-    }
-
-    public(friend) fun sub_crank_row_count(self: &address) acquires Aggregator {
-        let aggregator = borrow_global_mut<Aggregator>(*self);
-        aggregator.crank_row_count = aggregator.crank_row_count - 1;
-    }
-
-    public(friend) fun crank_row_count(self: &address): u64 acquires Aggregator {
-        borrow_global<Aggregator>(*self).crank_row_count
-    }
-
     public(friend) fun aggregator_create(account: &signer, aggregator: Aggregator) {
         move_to(account, aggregator);
     }
 
-    public(friend) fun aggregator_set(aggregator: Aggregator) acquires Aggregator {
-        let agg = borrow_global_mut<Aggregator>(aggregator.addr);
-        *agg = aggregator;
-    }
-
     public fun new(params: AggregatorConfigParams): Aggregator {
         Aggregator {
-            addr: params.addr,
             name: params.name,
             metadata: params.metadata,
             queue_address: params.queue_address,
@@ -183,7 +163,7 @@ module Switchboard::Aggregator {
             /* consecutive_failure_count: 0, */
             next_allowed_update_time: 0,
             is_locked: false,
-            crank_address: @0x0, // TODO: SET CRANK ADDR
+            crank_address: @0x0,
             latest_confirmed_round: default_round(),
             current_round: default_round(),
             job_keys: vector::empty(),
@@ -197,8 +177,8 @@ module Switchboard::Aggregator {
         }
     }
 
-    public fun set_config(aggregator: &mut Aggregator, params: AggregatorConfigParams) {
-        aggregator.addr = params.addr;
+    public fun set_config(params: &AggregatorConfigParams) acquires Aggregator {
+        let aggregator = borrow_global_mut<Aggregator>(params.addr);
         aggregator.name = params.name;
         aggregator.metadata = params.metadata;
         aggregator.queue_address = params.queue_address;
@@ -213,41 +193,75 @@ module Switchboard::Aggregator {
         aggregator.authority = params.authority;
     }
 
-    public fun key(aggregator: &Aggregator): vector<u8> {
-        let key = b"Aggregator";
-        let addr = bcs::to_bytes(&aggregator.addr);
-        vector::append(&mut key, addr);
-        hash::sha3_256(key)
+    public(friend) fun set_crank(addr: address, crank_addr: address) acquires Aggregator {
+        let aggregator = borrow_global_mut<Aggregator>(addr);
+        aggregator.crank_address = crank_addr;
     }
 
-    public fun addr(self: &Aggregator): address {
-        self.addr
+    public(friend) fun add_crank_row_count(self: address) acquires Aggregator {
+        let aggregator = borrow_global_mut<Aggregator>(self);
+        aggregator.crank_row_count = aggregator.crank_row_count + 1;
     }
 
-    public fun queue_from_conf(conf: &AggregatorConfigParams): address {
-        conf.queue_address
+    public(friend) fun sub_crank_row_count(self: address) acquires Aggregator {
+        let aggregator = borrow_global_mut<Aggregator>(self);
+        aggregator.crank_row_count = aggregator.crank_row_count - 1;
     }
 
-    public fun crank_disabled(addr: &address): bool acquires Aggregator {
-        borrow_global<Aggregator>(*addr).disable_crank
+    public(friend) fun apply_oracle_error(addr: address, oracle_idx: u64) acquires Aggregator {
+        let aggregator = borrow_global_mut<Aggregator>(addr);
+        aggregator.current_round.num_error = aggregator.current_round.num_error + 1;
+        let val_ref = vector::borrow_mut(&mut aggregator.current_round.errors_fulfilled, oracle_idx);
+        *val_ref = true
     }
 
-    public fun queue(addr: &address): address acquires Aggregator {
-        borrow_global<Aggregator>(*addr).queue_address
-    }
-
-    public fun lock(aggregator: &mut Aggregator) {
+    public(friend) fun lock(aggregator: &mut Aggregator) {
         aggregator.is_locked = true;
     }
 
-    public fun batch_size(self: address): u64 acquires Aggregator {
-        borrow_global_mut<Aggregator>(self).batch_size
+    public(friend) fun open_round(self: address, oracle_keys: &vector<address>) acquires Aggregator {
+        let aggregator = borrow_global_mut<Aggregator>(self);
+        let size = aggregator.batch_size;
+        aggregator.current_round = default_round();
+        aggregator.current_round.round_open_timestamp = timestamp::now_seconds();
+        aggregator.current_round.oracle_keys = *oracle_keys; // OracleQueue::next_n(queue, size);
+        aggregator.current_round.medians = vec_utils::new_sized(size, option::none());
+        aggregator.current_round.errors_fulfilled = vec_utils::new_sized(size, false);
+        aggregator.next_allowed_update_time = timestamp::now_seconds() + aggregator.min_update_delay_seconds;
+    }
+    
+    public(friend) fun save_result(
+        aggregator_addr: address, 
+        oracle_idx: u64, 
+        value: &SwitchboardDecimal,
+        min_response: &SwitchboardDecimal,
+        max_response: &SwitchboardDecimal,
+    ): bool acquires Aggregator {
+        let aggregator = borrow_global_mut<Aggregator>(aggregator_addr);
+        let val_ref = vector::borrow_mut(&mut aggregator.current_round.medians, oracle_idx);
+        *val_ref = option::some(*value);
+        let uwm = vec_utils::unwrap(&aggregator.current_round.medians);
+        aggregator.current_round.result = math::median_mut(&mut uwm);
+        if (math::gt(&aggregator.current_round.min_response, min_response)){
+            aggregator.current_round.min_response = *min_response;
+        };
+        if (math::lt(&aggregator.current_round.max_response, max_response)){
+            aggregator.current_round.max_response = *max_response;
+        };
+        aggregator.current_round.num_success = aggregator.current_round.num_success + 1;
+        aggregator.current_round.std_deviation = math::std_deviation(&uwm, &aggregator.current_round.result);
+        if (aggregator.current_round.num_success >= aggregator.min_oracle_results) {
+            aggregator.latest_confirmed_round = aggregator.current_round;
+            return true
+        }; 
+
+        false
     }
 
     // GETTERS 
     public fun latest_value(addr: address): SwitchboardDecimal acquires Aggregator {
         let aggregator = borrow_global<Aggregator>(addr);
-
+        
         // grab a copy of latest result
         aggregator.latest_confirmed_round.result
     }
@@ -257,9 +271,91 @@ module Switchboard::Aggregator {
         aggregator.next_allowed_update_time
     }
 
+    public fun job_keys(addr: address): vector<address> acquires Aggregator {
+        borrow_global<Aggregator>(addr).job_keys
+    }
+
+    public fun min_oracle_results(addr: address): u64 acquires Aggregator {
+        borrow_global<Aggregator>(addr).min_oracle_results
+    }
+
+    public fun crank_address(addr: address): address acquires Aggregator {
+        borrow_global<Aggregator>(addr).crank_address
+    }
+
+    public fun crank_disabled(addr: address): bool acquires Aggregator {
+        borrow_global<Aggregator>(addr).disable_crank
+    }
+
+    public(friend) fun crank_row_count(self: address): u64 acquires Aggregator {
+        borrow_global<Aggregator>(self).crank_row_count
+    }
+
+    public fun current_round_num_success(addr: address): u64 acquires Aggregator {
+        let aggregator = borrow_global<Aggregator>(addr);
+        aggregator.current_round.num_success
+    }
+
+    public fun current_round_num_error(addr: address): u64 acquires Aggregator {
+        let aggregator = borrow_global<Aggregator>(addr);
+        aggregator.current_round.num_error
+    }
+
+    public fun curent_round_oracle_key_at_idx(addr: address, idx: u64): address acquires Aggregator {
+        *vector::borrow(&borrow_global<Aggregator>(addr).current_round.oracle_keys, idx)
+    }
+    
+    public fun current_round_std_dev(addr: address): SwitchboardDecimal acquires Aggregator {
+        let aggregator = borrow_global<Aggregator>(addr);
+        aggregator.current_round.std_deviation
+    }
+
+    public fun current_round_result(addr: address): SwitchboardDecimal acquires Aggregator {
+        let aggregator = borrow_global<Aggregator>(addr);
+        aggregator.current_round.result
+    }
+
+    public fun is_median_fulfilled(addr: address, idx: u64): bool acquires Aggregator {
+        let aggregator = borrow_global<Aggregator>(addr);
+        let val = vector::borrow(&aggregator.current_round.medians, idx);
+        option::is_some(val)
+    }
+
+    public fun is_error_fulfilled(addr: address, idx: u64): bool acquires Aggregator {
+        let aggregator = borrow_global<Aggregator>(addr);
+        *vector::borrow(&aggregator.current_round.errors_fulfilled, idx)
+    }
+
+    public fun batch_size(self: address): u64 acquires Aggregator {
+        borrow_global_mut<Aggregator>(self).batch_size
+    }
+    
+    public fun queue(addr: address): address acquires Aggregator {
+        borrow_global<Aggregator>(addr).queue_address
+    }
+
+    public fun can_open_round(addr: address): bool acquires Aggregator {
+        let ref = borrow_global<Aggregator>(addr);
+        timestamp::now_seconds() >= ref.next_allowed_update_time
+    }
+
+    public fun is_jobs_checksum_equal(addr: address, vec: &vector<u8>): bool acquires Aggregator {
+        let checksum = borrow_global<Aggregator>(addr).jobs_checksum; // copy
+        let i = 0;
+        let size = vector::length(&checksum);
+        while (i < size) {
+            let left_byte = *vector::borrow(&checksum, i);
+            let right_byte = *vector::borrow(vec, i);
+            if (left_byte != right_byte) {
+                return false
+            };
+            i = i + 1;
+        };
+        true
+    }
+
     public entry fun new_test(account: &signer, value: u128, dec: u8, sign: bool) {
         let aggregator = Aggregator {
-            addr: @0x55,
             name: vector::empty(),
             metadata: vector::empty(),
             queue_address: @0x55,
@@ -268,7 +364,7 @@ module Switchboard::Aggregator {
             min_job_results: 1,
             min_update_delay_seconds: 5,
             start_after: 0,
-            variance_threshold: Math::num(0, 0, false),
+            variance_threshold: math::new(0, 0, false),
             force_report_period: 0, 
             expiration: 0,
             next_allowed_update_time: 0,
@@ -276,25 +372,29 @@ module Switchboard::Aggregator {
             crank_address: @0x55,
             latest_confirmed_round: AggregatorRound {
                 round_open_timestamp: 0,
-                result: Math::num(value, dec, sign),
-                std_deviation: Math::num(3141592653, 9, false),
-                min_response: Math::num(3141592653, 9, false),
-                max_response: Math::num(3141592653, 9, false),
+                result: math::new(value, dec, sign),
+                std_deviation: math::new(3141592653, 9, false),
+                min_response: math::new(3141592653, 9, false),
+                max_response: math::new(3141592653, 9, false),
                 oracle_keys: vector::empty(),
                 medians: vector::empty(),
                 current_payout: vector::empty(),
-                error_fulfilled: vector::empty(),
+                errors_fulfilled: vector::empty(),
+                num_success: 0,
+                num_error: 0,
             },
             current_round: AggregatorRound {
                 round_open_timestamp: 0,
-                result: Math::zero(),
-                std_deviation: Math::zero(),
-                min_response: Math::zero(),
-                max_response: Math::zero(),
+                result: math::zero(),
+                std_deviation: math::zero(),
+                min_response: math::zero(),
+                max_response: math::zero(),
                 oracle_keys: vector::empty(),
                 medians: vector::empty(),
                 current_payout: vector::empty(),
-                error_fulfilled: vector::empty(),
+                errors_fulfilled: vector::empty(),
+                num_success: 0,
+                num_error: 0,
             },
             job_keys: vector::empty(),
             job_weights: vector::empty(),
@@ -310,6 +410,6 @@ module Switchboard::Aggregator {
 
     public entry fun update_value(account: &signer, value: u128, dec: u8, neg: bool) acquires Aggregator {
         let ref = borrow_global_mut<Aggregator>(signer::address_of(account));
-        ref.latest_confirmed_round.result = Math::num(value, dec, neg);
+        ref.latest_confirmed_round.result = math::new(value, dec, neg);
     }
 }

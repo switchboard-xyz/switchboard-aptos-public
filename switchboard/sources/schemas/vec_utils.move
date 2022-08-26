@@ -1,4 +1,4 @@
-module Switchboard::VecUtils {
+module switchboard::vec_utils {
     use std::option::{Self, Option};
     use std::vector;
 
