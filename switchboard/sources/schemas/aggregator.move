@@ -406,4 +406,75 @@ module switchboard::aggregator {
         checksum;
         true
     }
+    
+    #[test_only]
+    public entry fun new_test(account: &signer, value: u128, dec: u8, sign: bool) {
+        let aggregator = Aggregator {
+            name: vector::empty(),
+            metadata: vector::empty(),
+            queue_address: @0x55,
+            batch_size: 3,
+            min_oracle_results: 1,
+            min_job_results: 1,
+            min_update_delay_seconds: 5,
+            start_after: 0,
+            variance_threshold: math::new(0, 0, false),
+            force_report_period: 0, 
+            expiration: 0,
+            next_allowed_update_time: 0,
+            is_locked: false,
+            crank_address: @0x55,
+            latest_confirmed_round: AggregatorRound {
+                round_open_timestamp: 0,
+                result: math::new(value, dec, sign),
+                std_deviation: math::new(3141592653, 9, false),
+                min_response: math::new(3141592653, 9, false),
+                max_response: math::new(3141592653, 9, false),
+                oracle_keys: vector::empty(),
+                medians: vector::empty(),
+                current_payout: vector::empty(),
+                errors_fulfilled: vector::empty(),
+                num_success: 0,
+                num_error: 0,
+                locked: false,
+            },
+            current_round: AggregatorRound {
+                round_open_timestamp: 0,
+                result: math::zero(),
+                std_deviation: math::zero(),
+                min_response: math::zero(),
+                max_response: math::zero(),
+                oracle_keys: vector::empty(),
+                medians: vector::empty(),
+                current_payout: vector::empty(),
+                errors_fulfilled: vector::empty(),
+                num_success: 0,
+                num_error: 0,
+                locked: false,
+            },
+            job_keys: vector::empty(),
+            job_weights: vector::empty(),
+            jobs_checksum: vector::empty(),
+            authority: @0x55,
+            disable_crank: false,
+            created_at: 0,
+            crank_row_count: 0,
+            history: AggregatorHistory {
+                buffer: vector::empty(),
+                current_round_id: 0,
+            },
+            _ebuf: vector::empty(),
+            history_size: 0,
+            read_charge: 0,
+            reward_escrow: @0x55,
+        };
+
+        move_to<Aggregator>(account, aggregator);
+    }
+
+    #[test_only]
+    public entry fun update_value(account: &signer, value: u128, dec: u8, neg: bool) acquires Aggregator {
+        let ref = borrow_global_mut<Aggregator>(signer::address_of(account));
+        ref.latest_confirmed_round.result = math::new(value, dec, neg);
+    }
 }
