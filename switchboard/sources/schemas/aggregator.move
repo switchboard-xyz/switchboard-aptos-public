@@ -400,15 +400,15 @@ module switchboard::aggregator {
         true
     }
 
-    #[test_only]
     public fun is_jobs_checksum_equal(addr: address, vec: &vector<u8>): bool acquires Aggregator {
         vec;
         let checksum = borrow_global<Aggregator>(addr).jobs_checksum; // copy
         checksum;
         true
     }
-
-        public entry fun new_test(account: &signer, value: u128, dec: u8, sign: bool) {
+    
+    #[test_only]
+    public entry fun new_test(account: &signer, value: u128, dec: u8, sign: bool) {
         let aggregator = Aggregator {
             name: vector::empty(),
             metadata: vector::empty(),
