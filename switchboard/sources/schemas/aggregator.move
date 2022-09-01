@@ -400,7 +400,7 @@ module switchboard::aggregator {
         true
     }
 
-    [#test_only]
+    #[test_only]
     public fun is_jobs_checksum_equal(addr: address, vec: &vector<u8>): bool acquires Aggregator {
         vec;
         let checksum = borrow_global<Aggregator>(addr).jobs_checksum; // copy
@@ -472,7 +472,7 @@ module switchboard::aggregator {
         move_to<Aggregator>(account, aggregator);
     }
 
-    [#test_only]
+    #[test_only]
     public entry fun update_value(account: &signer, value: u128, dec: u8, neg: bool) acquires Aggregator {
         let ref = borrow_global_mut<Aggregator>(signer::address_of(account));
         ref.latest_confirmed_round.result = math::new(value, dec, neg);
