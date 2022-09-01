@@ -7,9 +7,6 @@ std = '0x1'
 aptos_framework = '0x1'
 switchboard = '_'
 
-[dev-addresses]
-switchboard = '_'
-
 [dependencies]
 MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/move-stdlib/", rev = "main" }
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "main" }
